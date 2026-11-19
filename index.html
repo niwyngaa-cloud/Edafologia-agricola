@@ -1,0 +1,80 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Edafología Agrícola · Integración de conceptos</title><style>:root{font-family:system-ui,-apple-system,sans-serif;color:#18342c;background:#f5f7f3}*{box-sizing:border-box}main{max-width:760px;margin:30px auto;padding:20px}.panel{background:white;border:1px solid #d9e3dc;border-radius:18px;padding:24px;margin:15px 0}h1{margin-bottom:4px}p{line-height:1.5}.muted{color:#60756b}button{border:0;border-radius:10px;background:#17654b;color:white;padding:13px 17px;font-size:1rem;cursor:pointer;margin:5px}button:disabled{opacity:.5;cursor:not-allowed}.secondary{background:#e8f0eb;color:#194a39}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.card{display:block;width:100%;min-height:90px;text-align:left;background:#f2f6f2;color:#18342c;border:2px solid transparent;margin:0}.card.selected{border-color:#17654b;background:#dcefe3}.hidden{display:none}.timer{font-size:2.7rem;font-weight:700;font-variant-numeric:tabular-nums}small{display:block;color:#60756b;margin-top:8px}.warning{background:#fff6dc;padding:12px;border-radius:10px}button:focus-visible{outline:3px solid #d49b22;outline-offset:2px}</style></head><body><main><h1>Edafología Agrícola</h1><p class="muted">Simulador de integración de conceptos · Examen oral</p><section id="home" class="panel"><h2>Elegí una modalidad</h2><button onclick="start('practice')">Modo práctica</button><button onclick="start('exam')" class="secondary">Modo examen</button><p class="muted">En cada sorteo aparecen cinco conceptos. Elegí tres y prepará una exposición que los integre.</p></section><section id="session" class="panel hidden"><h2 id="modeTitle"></h2><p id="status" class="muted"></p><div id="cards" class="cards"></div><div id="actions"></div><div id="preparation" class="hidden"><h3>Preparación de la exposición</h3><div class="timer" id="timer">15:00</div><p class="muted">El tiempo continúa aunque cierres esta pestaña.</p></div><button class="secondary" onclick="goHome()">Volver al inicio</button></section><p class="muted"><small>El modo examen limita un sorteo por 24 horas en este navegador. No es una restricción segura frente a cambios de navegador, modo privado o eliminación de datos.</small></p></main><script>
+// Banco de 13 pilas temáticas. Los nombres de las pilas no aparecen en pantalla.
+// Cada sublista es una pila; el sorteo toma una sola tarjeta de cada pila.
+const GROUPS = [
+  ['Factores formadores','Procesos formadores','Meteorización','LOESS','Formación del suelo','Funciones del suelo','Horizontes'],
+  ['Densidad aparente','Textura','Porosidad','Agregados','Estructura','Agentes cementantes'],
+  ['Illita','Minerales 2:1','Sustitución isomórfica','Feldespatos','Cuarzo','Caolinita','Óxidos de hierro y aluminio'],
+  ['Curva característica de humedad','Potencial mátrico','Agua útil','Capacidad de campo','Saturación (agua)','Infiltración'],
+  ['Cargas pH dependientes','Cargas permanentes','Capacidad de intercambio catiónico','Doble capa difusa','Adsorción fuerte','Adsorción débil','Capacidad de intercambio aniónico'],
+  ['Acidez activa','Acidez intercambiable','Capacidad buffer','Encalado','pE (potencial redox)','Escalera redox','Saturación con bases'],
+  ['Porcentaje de sodio intercambiable','Conductividad eléctrica','Enyesado','Relación de adsorción de sodio','Agentes dispersantes','Carbonatos/Bicarbonatos'],
+  ['Ingresos de carbono','Egresos de carbono','Protección de la materia orgánica','Materia orgánica','Relación C:N'],
+  ['Volatilización','Desnitrificación','Lavado de nitrógeno','Mineralización de nitrógeno','Nitrógeno disponible','Nitrógeno orgánico','Estados óxido-reducción de nitrógeno'],
+  ['Fósforo orgánico','Lavado de fósforo','Erosión de fósforo','Sorción de fósforo','Precipitación de fósforo','Fósforo Bray','Fósforo en solución'],
+  ['Lavado de azufre','Mineralización de azufre','Azufre disponible','Pérdidas gaseosas','Azufre orgánico','Deposiciones atmosféricas','Estados óxido-reducción de azufre'],
+  ['Fijación de potasio','Bases intercambiables','Erosión de bases','Lavado de bases','Exportación de bases','Pool inorgánico de bases'],
+  ['Temperatura','Precipitaciones (lluvia)','Impacto ambiental']
+];
+const EXAM_KEY='edafologia_exam_v2',PRACTICE_KEY='edafologia_practice_v2',DAY=86400000,PREP=900000;
+let mode='practice',state=null,tick=null;
+const el=id=>document.getElementById(id);
+function randomIndex(n){const x=new Uint32Array(1),limit=Math.floor(4294967296/n)*n;do{crypto.getRandomValues(x)}while(x[0]>=limit);return x[0]%n}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=randomIndex(i+1);[a[i],a[j]]=[a[j],a[i]]}return a}
+function draw(){if(GROUPS.length<5||GROUPS.some(g=>!g.length))throw Error('El banco requiere al menos cinco grupos no vacíos');return shuffle(GROUPS.map((_,i)=>i)).slice(0,5).map(i=>GROUPS[i][randomIndex(GROUPS[i].length)])}
+function key(){return mode==='exam'?EXAM_KEY:PRACTICE_KEY}
+function load(k){try{const x=JSON.parse(localStorage.getItem(k));return x&&Array.isArray(x.cards)&&x.cards.length===5?x:null}catch{return null}}
+function save(){localStorage.setItem(key(),JSON.stringify(state))}
+function start(m){mode=m;el('home').classList.add('hidden');el('session').classList.remove('hidden');el('modeTitle').textContent=m==='exam'?'Modo examen':'Modo práctica';state=load(key());if(m==='exam'&&state&&Date.now()-state.drawnAt>=DAY)state=null;if(!state){state={cards:draw(),selected:[],drawnAt:Date.now(),confirmedAt:null};save()}render()}
+function goHome(){clearInterval(tick);el('session').classList.add('hidden');el('home').classList.remove('hidden')}
+function select(i){if(state.confirmedAt)return;const a=state.selected;state.selected=a.includes(i)?a.filter(j=>j!==i):a.length<3?[...a,i]:a;save();render()}
+function confirmSelection(){if(state.selected.length!==3)return;state.confirmedAt=Date.now();save();render()}
+function newPractice(){if(mode!=='practice')return;state={cards:draw(),selected:[],drawnAt:Date.now(),confirmedAt:null};save();render()}
+function render(){
+ clearInterval(tick);
+ const locked=mode==='exam'&&Date.now()-state.drawnAt<DAY;
+ el('status').textContent=mode==='exam'
+  ?'Sorteo del '+new Date(state.drawnAt).toLocaleString('es-AR')+' · El tiempo de preparación comenzó al ingresar al modo examen.'
+  :'Elegí tres conceptos para tu exposición.';
+ const cards=el('cards');cards.replaceChildren();
+ state.cards.forEach((c,i)=>{
+  if(state.confirmedAt&&!state.selected.includes(i))return;
+  const b=document.createElement('button');
+  b.className='card'+(state.selected.includes(i)?' selected':'');
+  b.textContent=(state.selected.includes(i)?'✓ ':'')+c;
+  b.disabled=!!state.confirmedAt;
+  b.setAttribute('aria-pressed',String(state.selected.includes(i)));
+  b.onclick=()=>select(i);cards.appendChild(b);
+ });
+ const actions=el('actions');actions.replaceChildren();
+ function add(label,fn,disabled=false,secondary=false){
+  const b=document.createElement('button');b.textContent=label;b.disabled=disabled;
+  if(secondary)b.className='secondary';b.onclick=fn;actions.appendChild(b);
+ }
+ if(!state.confirmedAt)add('Confirmar mis tres conceptos',confirmSelection,state.selected.length!==3);
+ if(mode==='practice')add('Nuevo sorteo',newPractice,false,true);
+ else if(!locked)add('Nuevo sorteo (24 h cumplidas)',()=>{
+  state={cards:draw(),selected:[],drawnAt:Date.now(),confirmedAt:null};save();render();
+ },false,true);
+ const prep=el('preparation');
+ const timerStart=mode==='exam'?state.drawnAt:state.confirmedAt;
+ prep.classList.toggle('hidden',!timerStart);
+ const timerTitle=prep.querySelector('h3');
+ timerTitle.textContent=mode==='exam'?'Tiempo disponible para elegir y preparar la exposición':'Preparación de la exposición';
+ const lockInfo=document.createElement('small');
+ if(mode==='exam'&&locked)actions.appendChild(lockInfo);
+ function update(){
+  if(timerStart){
+   const left=Math.max(0,Math.ceil((timerStart+PREP-Date.now())/1000));
+   el('timer').textContent=left===0?'Tiempo finalizado':String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0');
+  }
+  if(mode==='exam'&&locked){
+   const ms=Math.max(0,state.drawnAt+DAY-Date.now());
+   if(ms===0){render();return}
+   const h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),s=Math.floor(ms%60000/1000);
+   lockInfo.textContent='Tiempo hasta el próximo sorteo: '+[h,m,s].map(x=>String(x).padStart(2,'0')).join(':');
+  }
+ }
+ update();tick=setInterval(update,1000);
+}
+</script></body></html>
